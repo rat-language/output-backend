@@ -1,13 +1,14 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import vm from 'vm';
 
 // Assume you have a function `compile` in `compiler.js` that executes the compilation logic
 import compile from './compiler/compiler.js';
 
 const app = express();
 
-app.use(cors());  // It's typically a good practice to place middleware usage before any routes.
+app.use(cors());  
 app.use(bodyParser.json());
 
 app.get('/', (req, res) => {
@@ -17,14 +18,32 @@ app.get('/', (req, res) => {
 app.post('/compile', (req, res) => {
   const { code, outputType } = req.body;
   try {
-    const output = compile(code, outputType);
-    console.log("Compilation Output:", output); // Log the output to the console
+    // This compiles the code and presumably translates it to JS.
+    const jsCode = compile(code, outputType);
+
+    // Create a new script from the compiled code.
+    const script = new vm.Script(jsCode);
+
+    // Create a context for the script to run in, providing a console object.
+    let output = ''; // This will capture the output.
+    const context = vm.createContext({
+      console: {
+        log: (...args) => {
+          output += args.join(' ') + '\n'; // Capture console.log output
+        }
+      }
+    });
+
+    // Run the script in the defined context.
+    script.runInContext(context);
+
+    // Send back the captured output.
     res.send({ output });
   } catch (error) {
-    console.error("Compilation Error:", error); // Log errors to the console
     res.status(500).send({ error: error.message });
   }
 });
+
 
 const port = process.env.PORT || 4000;
 app.listen(port, () => {
